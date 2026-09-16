@@ -189,11 +189,22 @@ MCP calls and the modules above.
 Framework: Vitest. CI: GitHub Actions on `macos-latest`.
 
 **Mechanism test (the important one).** Construct a fake `.app` bundle in a temp
-directory whose executable records its argv and sleeps. Then assert that
-`open -n` against it produces **two distinct PIDs**, and that the second process
-**receives the document path as an argument**. This machine-verifies the entire
-core mechanism without requiring Ableton Live to be installed, on any Mac
-including CI.
+directory and assert that `open -n` against it produces **two distinct PIDs**
+and that **each instance receives the document path**. This machine-verifies the
+core mechanism without requiring Ableton Live, on any Mac including CI.
+
+The fake bundle must be an **AppleScript applet built with `osacompile`**, not a
+shell script. This was verified experimentally and corrects an earlier
+assumption in this document:
+
+- `open -n -a <App> <file>` does launch a genuinely separate instance per call.
+  Confirmed: two calls, two distinct PIDs.
+- The document is delivered by **Apple Event (`odoc`), not `argv`.** A
+  shell-script bundle logs an empty argv and never learns the file exists.
+- An AppleScript applet has a real event loop, so its `on open` handler receives
+  the document exactly as Live does, including paths containing spaces.
+
+Any test asserting on a fake app's `argv` will fail for the wrong reason.
 
 **Unit tests.** App-bundle globbing and version selection, including fixtures
 for Live 11 and Live 12 bundles side by side and for non-Suite editions; project discovery with

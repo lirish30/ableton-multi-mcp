@@ -33,6 +33,18 @@ installs one thing, talks to their AI agent, and gets a second project open.
 macOS only. The server refuses to start on other platforms with a clear message
 naming the platform it detected.
 
+## Ableton Version and Edition Support
+
+Version- and edition-agnostic by design. The mechanism is provided by macOS
+(`open -n`), not by Live, so it does not depend on anything inside the
+application bundle. Live 9, 10, 11 and 12 are all supported, as are the Lite,
+Intro, Standard, Suite and Trial editions.
+
+No version-specific code paths exist. The only version-aware logic is app-bundle
+discovery, which globs `Ableton Live *.app` and therefore matches any of them.
+A trial install is a normal bundle in `/Applications` and works identically,
+which means verification does not require a purchased license.
+
 ## Core Mechanism
 
 ```
@@ -115,7 +127,10 @@ ask for a cosmetic field.
 
 1. `ABLETON_APP_PATH` environment variable, if set. Used verbatim.
 2. Glob `/Applications` and `~/Applications` for `Ableton Live *.app`.
-3. If several are found, select the highest version number.
+3. If several are found, select the highest version number, and **report the
+   selection in the `open_project` result** so a user with both Live 11 and
+   Live 12 installed can see which one was used rather than being surprised.
+   `ABLETON_APP_PATH` is the way to pin a specific version or edition.
 
 If none is found, the error names every location searched and explains the
 `ABLETON_APP_PATH` override. Installs vary widely — external drives, renamed
@@ -157,7 +172,8 @@ official capability.
 Small modules, each independently testable, no module larger than its one job:
 
 - `platform.ts` — macOS guard.
-- `ableton-locator.ts` — find the Live app bundle.
+- `ableton-locator.ts` — find the Live app bundle. Version-agnostic; parses
+  version numbers only to order multiple installs.
 - `project-finder.ts` — Spotlight/`find` discovery, backup filtering, fuzzy ranking.
 - `launcher.ts` — argument construction, `execFile` invocation, PID diffing.
 - `ledger.ts` — in-memory `pid -> project` record. Not persisted; a server
@@ -179,13 +195,14 @@ directory whose executable records its argv and sleeps. Then assert that
 core mechanism without requiring Ableton Live to be installed, on any Mac
 including CI.
 
-**Unit tests.** App-bundle globbing and version selection; project discovery with
+**Unit tests.** App-bundle globbing and version selection, including fixtures
+for Live 11 and Live 12 bundles side by side and for non-Suite editions; project discovery with
 Spotlight stubbed; `Backup/` exclusion; fuzzy ranking order; argument array
 construction for paths containing spaces, quotes, and non-ASCII characters;
 every error branch in the table above.
 
 **Human verification.** Before publishing, the author runs the server against a
-real Ableton Live install and confirms: a second project opens in a genuinely
+real Ableton Live install (any version or edition, trial included) and confirms: a second project opens in a genuinely
 separate instance, `list_open_instances` reports both, and the warnings match
 observed behavior. The package is not published until this passes.
 

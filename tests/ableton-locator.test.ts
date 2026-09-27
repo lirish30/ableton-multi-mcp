@@ -62,6 +62,10 @@ describe("selectNewest", () => {
     ];
     expect(selectNewest(installs).version).toBe(9);
   });
+
+  it("throws when called with an empty array", () => {
+    expect(() => selectNewest([])).toThrow("selectNewest called with an empty array");
+  });
 });
 
 describe("findInstallsIn", () => {

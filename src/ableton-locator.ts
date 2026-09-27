@@ -28,6 +28,9 @@ export function parseVersion(bundleName: string): number | null {
 }
 
 export function selectNewest(installs: AbletonInstall[]): AbletonInstall {
+  if (installs.length === 0) {
+    throw new Error("selectNewest called with an empty array");
+  }
   return [...installs].sort((a, b) => (b.version ?? -1) - (a.version ?? -1))[0];
 }
 

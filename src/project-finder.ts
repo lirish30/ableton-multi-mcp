@@ -40,20 +40,6 @@ export function scoreMatch(query: string, name: string): number {
   const n = normalize(name);
   if (q.length === 0) return 0;
   if (n === q) return 1;
-
-  const queryWords = q.split(/\s+/);
-  const nameWords = n.split(/\s+/);
-
-  // Check if query words match the start of name words (word-level prefix)
-  if (
-    queryWords.length <= nameWords.length &&
-    queryWords.every((w, i) => nameWords[i] === w)
-  ) {
-    // Penalize for extra words in the name
-    const extraWords = nameWords.length - queryWords.length;
-    return 0.8 - 0.05 * extraWords;
-  }
-
   if (n.startsWith(q)) return 0.8;
   if (n.includes(q)) return 0.6;
   if (isSubsequence(q.replace(/\s+/g, ""), n.replace(/\s+/g, ""))) return 0.4;

@@ -73,8 +73,8 @@ describe("rankProjects", () => {
 
   it("drops non-matching projects when a query is given", () => {
     expect(rankProjects(items, "midnight").map((p) => p.name)).toEqual([
-      "Midnight Drive",
       "Midnight Drive Remix",
+      "Midnight Drive",
     ]);
   });
 

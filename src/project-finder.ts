@@ -81,7 +81,7 @@ async function spotlightList(): Promise<string[]> {
   return stdout.split("\n").filter(Boolean);
 }
 
-async function findList(roots: string[]): Promise<string[]> {
+export async function findList(roots: string[]): Promise<string[]> {
   const existing: string[] = [];
   for (const root of roots) {
     try {
@@ -91,12 +91,60 @@ async function findList(roots: string[]): Promise<string[]> {
     }
   }
   if (existing.length === 0) return [];
-  const { stdout } = await run(
-    "find",
-    [...existing, "-maxdepth", "6", "-type", "f", "-name", "*.als"],
-    { maxBuffer: 16 * 1024 * 1024 }
-  );
+  // Hidden entries below the roots are pruned: external volumes carry
+  // root-owned .Spotlight-V100 / .Trashes / .fseventsd folders that a normal
+  // user cannot read, and "._Name.als" AppleDouble files that are not real
+  // Live Sets. -mindepth 1 keeps a root that itself starts with "." searchable.
+  const args = [
+    ...existing,
+    "-maxdepth", "6",
+    "-mindepth", "1",
+    "-name", ".*", "-prune",
+    "-o", "-type", "f", "-name", "*.als", "-print",
+  ];
+  let stdout: string;
+  try {
+    ({ stdout } = await run("find", args, { maxBuffer: 16 * 1024 * 1024 }));
+  } catch (err) {
+    // find exits non-zero when ANY subdirectory is unreadable, but it still
+    // prints every match it could reach. Keep those rather than discarding
+    // the whole search; only fail when it produced nothing usable at all.
+    const partial = (err as { stdout?: unknown }).stdout;
+    if (typeof partial === "string" && partial.trim().length > 0) {
+      stdout = partial;
+    } else {
+      throw err;
+    }
+  }
   return stdout.split("\n").filter(Boolean);
+}
+
+/**
+ * Lists candidate .als files from BOTH Spotlight and a direct search of the
+ * configured roots, merged and de-duplicated. The roots are always searched,
+ * because Spotlight commonly skips external drives and excluded folders, and
+ * that is exactly where ABLETON_PROJECTS_DIRS tends to point.
+ */
+export async function listProjectFiles(
+  roots: string[],
+  spotlight: () => Promise<string[]> = spotlightList
+): Promise<string[]> {
+  let fromSpotlight: string[] = [];
+  try {
+    fromSpotlight = await spotlight();
+  } catch {
+    fromSpotlight = [];
+  }
+
+  let fromRoots: string[] = [];
+  try {
+    fromRoots = await findList(roots);
+  } catch (err) {
+    // A failed root search should not hide what Spotlight already found.
+    if (fromSpotlight.length === 0) throw err;
+  }
+
+  return [...new Set([...fromSpotlight, ...fromRoots])];
 }
 
 export async function findProjects(
@@ -110,16 +158,7 @@ export async function findProjects(
   const roots = opts.roots ?? defaultProjectRoots();
   const listFiles =
     opts.listFiles ??
-    (async () => {
-      let paths: string[] = [];
-      try {
-        paths = await spotlightList();
-      } catch {
-        paths = [];
-      }
-      if (paths.length === 0) paths = await findList(roots);
-      return paths;
-    });
+    (() => listProjectFiles(roots));
 
   const paths = (await listFiles()).filter((p) => !isBackupPath(p));
 

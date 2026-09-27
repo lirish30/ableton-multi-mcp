@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { locateAbleton } from "./ableton-locator.js";
-import { findProjects } from "./project-finder.js";
+import { defaultProjectRoots, findProjects } from "./project-finder.js";
 import { resolveProject } from "./resolve.js";
 import { launchProject, listInstancePids } from "./launcher.js";
 import { Ledger } from "./ledger.js";
@@ -22,6 +22,27 @@ const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Names the folders that were actually searched (the defaults, or whatever
+ * ABLETON_PROJECTS_DIRS overrides them with), so a "not found" is honest
+ * about where the server looked and how to point it somewhere else.
+ */
+function searchedRootsHint(env: NodeJS.ProcessEnv = process.env): string {
+  const roots = defaultProjectRoots(env);
+  const list =
+    roots.length > 0 ? roots.map((r) => `  - ${r}`).join("\n") : "  (no folders)";
+  const source = env.ABLETON_PROJECTS_DIRS
+    ? `These folders come from ABLETON_PROJECTS_DIRS. Check that they exist ` +
+      `and contain your .als files, or change the variable ` +
+      `(a colon-separated list of folders).`
+    : `If your projects live somewhere else, set the ABLETON_PROJECTS_DIRS ` +
+      `environment variable to a colon-separated list of folders, for example:\n` +
+      `  ABLETON_PROJECTS_DIRS="/Volumes/Audio/Projects:$HOME/Music/Sets"`;
+  return (
+    `Searched Spotlight's index and these folders:\n${list}\n\n${source}`
+  );
 }
 
 export function createServer(overrides: Partial<ServerDeps> = {}): McpServer {
@@ -54,8 +75,8 @@ export function createServer(overrides: Partial<ServerDeps> = {}): McpServer {
         if (projects.length === 0) {
           return text(
             query
-              ? `No Ableton projects matched "${query}". Set ABLETON_PROJECTS_DIRS if your projects live outside ~/Music/Ableton and ~/Documents/Ableton.`
-              : "No Ableton projects were found."
+              ? `No Ableton projects matched "${query}". ${searchedRootsHint()}`
+              : `No Ableton projects were found. ${searchedRootsHint()}`
           );
         }
         const lines = projects.map(
@@ -97,7 +118,8 @@ export function createServer(overrides: Partial<ServerDeps> = {}): McpServer {
 
       if (resolution.kind === "none") {
         return text(
-          `No Ableton project matched "${resolution.query}". Try find_projects to see what is available.`
+          `No Ableton project matched "${resolution.query}". ${searchedRootsHint()}\n\n` +
+            `Try find_projects to see what is available.`
         );
       }
       if (resolution.kind === "ambiguous") {

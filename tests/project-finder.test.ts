@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile, utimes } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, writeFile, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +9,8 @@ import {
   rankProjects,
   defaultProjectRoots,
   findProjects,
+  findList,
+  listProjectFiles,
   type LiveProject,
 } from "../src/project-finder.js";
 
@@ -157,5 +159,99 @@ describe("findProjects", () => {
     ];
     const results = await findProjects({ query: "sunrise", listFiles });
     expect(results.map((r) => r.name)).toEqual(["Sunrise"]);
+  });
+});
+
+describe("findList (direct search of the configured roots)", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "abl-find-"));
+  });
+
+  afterEach(async () => {
+    // Restore permissions first, or rm cannot descend into the locked folder.
+    await chmod(join(dir, "Locked"), 0o755).catch(() => {});
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("keeps every readable match when a subdirectory is unreadable", async () => {
+    await mkdir(join(dir, "Good Project"), { recursive: true });
+    await writeFile(join(dir, "Good Project", "Good.als"), "x");
+    await mkdir(join(dir, "Locked"), { recursive: true });
+    await writeFile(join(dir, "Locked", "Unreachable.als"), "x");
+    await chmod(join(dir, "Locked"), 0o000);
+
+    const found = await findList([dir]);
+    expect(found).toContain(join(dir, "Good Project", "Good.als"));
+  });
+
+  it("skips hidden folders and AppleDouble ._ files", async () => {
+    await mkdir(join(dir, ".Trashes"), { recursive: true });
+    await writeFile(join(dir, ".Trashes", "Deleted.als"), "x");
+    await writeFile(join(dir, "._Real.als"), "x");
+    await writeFile(join(dir, "Real.als"), "x");
+
+    expect(await findList([dir])).toEqual([join(dir, "Real.als")]);
+  });
+
+  it("still searches a root whose own name starts with a dot", async () => {
+    await mkdir(join(dir, ".sets", "Inner"), { recursive: true });
+    await writeFile(join(dir, ".sets", "Inner", "Dotted.als"), "x");
+
+    expect(await findList([join(dir, ".sets")])).toEqual([
+      join(dir, ".sets", "Inner", "Dotted.als"),
+    ]);
+  });
+
+  it("returns nothing, rather than throwing, when no root exists", async () => {
+    expect(await findList([join(dir, "missing")])).toEqual([]);
+  });
+});
+
+describe("listProjectFiles", () => {
+  let dir: string;
+  let elsewhere: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "abl-roots-"));
+    elsewhere = await mkdtemp(join(tmpdir(), "abl-spot-"));
+    await writeFile(join(dir, "On External Drive.als"), "x");
+    await writeFile(join(elsewhere, "Indexed By Spotlight.als"), "x");
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+    await rm(elsewhere, { recursive: true, force: true });
+  });
+
+  it("searches the configured roots even when Spotlight finds other files", async () => {
+    const spotlight = async () => [join(elsewhere, "Indexed By Spotlight.als")];
+    const files = await listProjectFiles([dir], spotlight);
+    expect(files).toContain(join(dir, "On External Drive.als"));
+    expect(files).toContain(join(elsewhere, "Indexed By Spotlight.als"));
+  });
+
+  it("de-duplicates files found by both Spotlight and the root search", async () => {
+    const shared = join(dir, "On External Drive.als");
+    const files = await listProjectFiles([dir], async () => [shared]);
+    expect(files.filter((f) => f === shared)).toHaveLength(1);
+  });
+
+  it("still searches the roots when Spotlight fails outright", async () => {
+    const spotlight = async (): Promise<string[]> => {
+      throw new Error("mdfind unavailable");
+    };
+    expect(await listProjectFiles([dir], spotlight)).toEqual([
+      join(dir, "On External Drive.als"),
+    ]);
+  });
+
+  it("is findProjects' default, so a root outside Spotlight is found end to end", async () => {
+    // No listFiles override: this wires through the real mdfind. It only
+    // discriminates the old bug on a machine where Spotlight returns other .als
+    // files; the injected-Spotlight tests above cover that case everywhere.
+    const results = await findProjects({ roots: [dir], query: "On External Drive" });
+    expect(results.map((r) => r.path)).toContain(join(dir, "On External Drive.als"));
   });
 });

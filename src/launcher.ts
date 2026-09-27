@@ -65,6 +65,20 @@ export async function listInstancePids(appPath: string): Promise<number[]> {
 
 const POLL_INTERVAL_MS = 150;
 
+// Launches are identified by diffing the running PIDs before and after
+// `open -n`. Two launches overlapping would each see the other's new PID as
+// "fresh", so the snapshot -> open -> poll sequence must run one at a time.
+// Module-level state is correct here: one server process, one queue.
+let launchQueue: Promise<unknown> = Promise.resolve();
+
+function serialized<T>(work: () => Promise<T>): Promise<T> {
+  const result = launchQueue.then(work);
+  // Keep the chain alive after a failed launch; the caller still sees the
+  // rejection through `result`.
+  launchQueue = result.catch(() => {});
+  return result;
+}
+
 export async function launchProject(opts: {
   appPath: string;
   projectPath: string;
@@ -73,7 +87,14 @@ export async function launchProject(opts: {
   const { appPath } = opts;
   const timeoutMs = opts.timeoutMs ?? 15000;
   const projectPath = await validateProjectPath(opts.projectPath);
+  return serialized(() => launchAndIdentify(appPath, projectPath, timeoutMs));
+}
 
+async function launchAndIdentify(
+  appPath: string,
+  projectPath: string,
+  timeoutMs: number
+): Promise<LaunchResult> {
   const before = new Set(await listInstancePids(appPath));
 
   try {

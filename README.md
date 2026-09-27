@@ -8,8 +8,10 @@ Running more than one instance of Ableton Live at the same time is an
 **unsupported community workaround**, not a feature Ableton ships or
 endorses. This server automates that workaround (macOS lets you launch a
 second copy of an already-running app with `open -n`) so an AI agent can open
-several Live Sets side by side. It works reliably in practice, but you are
-relying on behaviour Ableton doesn't officially support — see
+several Live Sets side by side. It uses a standard macOS mechanism
+(`open -n`) that this project's test suite verifies launches genuinely
+separate instances, but you are relying on behaviour Ableton doesn't
+officially support — see
 [Limitations](#limitations) below before you lean on it for anything
 important.
 

@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/server.js";
@@ -139,6 +141,48 @@ describe("MCP server", () => {
     const text = textOf(await client.callTool({ name: "list_open_instances", arguments: {} }));
     expect(text).toContain("Known.als");
     expect(text).toMatch(/unknown/i);
+  });
+
+  describe("project-not-found messages name the roots actually searched", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("find_projects lists the ABLETON_PROJECTS_DIRS override, one root per line", async () => {
+      vi.stubEnv("ABLETON_PROJECTS_DIRS", "/nonexistent/one:/Volumes/Audio/Sets");
+      const client = await connect({ find: async () => [] });
+      const text = textOf(await client.callTool({ name: "find_projects", arguments: { query: "zzz" } }));
+      expect(text).toContain("  - /nonexistent/one\n");
+      expect(text).toContain("  - /Volumes/Audio/Sets");
+      expect(text).toMatch(/ABLETON_PROJECTS_DIRS/);
+      expect(text).not.toContain("Music/Ableton");
+    });
+
+    it("find_projects lists the default roots when there is no override", async () => {
+      vi.stubEnv("ABLETON_PROJECTS_DIRS", "");
+      const client = await connect({ find: async () => [] });
+      const text = textOf(await client.callTool({ name: "find_projects", arguments: {} }));
+      expect(text).toContain(`  - ${join(homedir(), "Music", "Ableton")}`);
+      expect(text).toContain(`  - ${join(homedir(), "Documents", "Ableton")}`);
+      expect(text).toMatch(/set the ABLETON_PROJECTS_DIRS/i);
+    });
+
+    it("open_project lists the override when no project matches", async () => {
+      vi.stubEnv("ABLETON_PROJECTS_DIRS", "/nonexistent");
+      const client = await connect({
+        locate: async () => APP,
+        resolve: async () => ({ kind: "none", query: "Ghost Set" }),
+        launch: async () => {
+          throw new Error("must not launch when nothing matched");
+        },
+      });
+      const text = textOf(
+        await client.callTool({ name: "open_project", arguments: { name_or_path: "Ghost Set" } })
+      );
+      expect(text).toContain('No Ableton project matched "Ghost Set"');
+      expect(text).toContain("  - /nonexistent");
+      expect(text).toMatch(/ABLETON_PROJECTS_DIRS/);
+    });
   });
 
   it("list_open_instances says so when nothing is running", async () => {

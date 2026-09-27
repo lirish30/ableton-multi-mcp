@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -82,11 +82,47 @@ describe("findInstallsIn", () => {
 });
 
 describe("locateAbleton", () => {
-  it("honours ABLETON_APP_PATH verbatim", async () => {
+  it("honours ABLETON_APP_PATH, resolved to its canonical path", async () => {
     await makeBundle(dir, "Custom Live.app");
     const custom = join(dir, "Custom Live.app");
     const found = await locateAbleton({ env: { ABLETON_APP_PATH: custom }, searchDirs: [] });
-    expect(found.appPath).toBe(custom);
+    // tmpdir() lives under /var, which macOS symlinks to /private/var.
+    expect(found.appPath).toBe(await realpath(custom));
+    expect(found.bundleName).toBe("Custom Live.app");
+  });
+
+  it("strips a trailing slash from ABLETON_APP_PATH", async () => {
+    await makeBundle(dir, "Ableton Live 12 Suite.app");
+    const real = await realpath(join(dir, "Ableton Live 12 Suite.app"));
+    const found = await locateAbleton({
+      env: { ABLETON_APP_PATH: `${real}//` },
+      searchDirs: [],
+    });
+    expect(found.appPath).toBe(real);
+    expect(found.appPath.endsWith("/")).toBe(false);
+    expect(found.version).toBe(12);
+  });
+
+  it("resolves an ABLETON_APP_PATH symlink to the real bundle", async () => {
+    await makeBundle(dir, "Ableton Live 11 Suite.app");
+    const real = await realpath(join(dir, "Ableton Live 11 Suite.app"));
+    const link = join(dir, "Live.app");
+    await symlink(real, link);
+    const found = await locateAbleton({ env: { ABLETON_APP_PATH: link }, searchDirs: [] });
+    expect(found.appPath).toBe(real);
+    expect(found.bundleName).toBe("Ableton Live 11 Suite.app");
+    expect(found.version).toBe(11);
+  });
+
+  it("resolves a symlinked bundle found in a search directory", async () => {
+    const elsewhere = join(dir, "Volume");
+    await makeBundle(elsewhere, "Ableton Live 12 Suite.app");
+    const apps = join(dir, "Applications");
+    await mkdir(apps);
+    await symlink(join(elsewhere, "Ableton Live 12 Suite.app"), join(apps, "Ableton Live 12 Suite.app"));
+    const found = await locateAbleton({ env: {}, searchDirs: [apps] });
+    expect(found.appPath).toBe(await realpath(join(elsewhere, "Ableton Live 12 Suite.app")));
+    expect(found.version).toBe(12);
   });
 
   it("rejects an ABLETON_APP_PATH that does not exist", async () => {

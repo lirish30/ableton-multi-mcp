@@ -1,6 +1,6 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 export interface AbletonInstall {
   appPath: string;
@@ -63,8 +63,14 @@ export async function locateAbleton(opts: {
 
   const override = env.ABLETON_APP_PATH;
   if (override) {
+    // Canonicalise before anything downstream sees the path. A running
+    // instance's command line holds the OS-resolved real path, so a trailing
+    // slash or a symlink here would make PID tracking silently miss every
+    // launch, and an agent told "could not confirm" might launch again.
+    let appPath: string;
     try {
-      const info = await stat(override);
+      appPath = await realpath(override.replace(/\/+$/, "") || "/");
+      const info = await stat(appPath);
       if (!info.isDirectory()) throw new Error("not a bundle");
     } catch {
       throw new Error(
@@ -73,8 +79,8 @@ export async function locateAbleton(opts: {
           `default locations.`
       );
     }
-    const bundleName = override.replace(/\/+$/, "").split("/").pop() ?? override;
-    return { appPath: override, bundleName, version: parseVersion(bundleName) };
+    const bundleName = basename(appPath);
+    return { appPath, bundleName, version: parseVersion(bundleName) };
   }
 
   const found: AbletonInstall[] = [];
@@ -82,5 +88,12 @@ export async function locateAbleton(opts: {
     found.push(...(await findInstallsIn(dir)));
   }
   if (found.length === 0) throw new AbletonNotFoundError(searchDirs);
-  return selectNewest(found);
+  const newest = selectNewest(found);
+  try {
+    // Same reason as above: /Applications may hold a symlink to a bundle on
+    // another volume. Keep the discovered bundleName, which carries the version.
+    return { ...newest, appPath: await realpath(newest.appPath) };
+  } catch {
+    return newest;
+  }
 }

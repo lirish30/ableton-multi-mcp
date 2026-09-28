@@ -12,3 +12,7 @@ dist/
 # The author's own Ableton project library, used for local manual testing —
 # personal creative work, never committed.
 /projects/
+
+# Internal build planning (brainstorming spec + implementation plan) — not
+# part of the shipped project or its public documentation.
+/docs/

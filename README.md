@@ -1,5 +1,9 @@
 # ableton-multi-mcp
 
+[![CI](https://github.com/lirish30/ableton-multi-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/lirish30/ableton-multi-mcp/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/ableton-multi-mcp.svg)](https://www.npmjs.com/package/ableton-multi-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Opens multiple Ableton Live projects at once on macOS, driven by your AI agent.
 
 ## What this is
@@ -114,3 +118,26 @@ server snapshots the PIDs of running Ableton processes before the `open`
 call, then polls the process list afterward and diffs the two sets — any PID
 that's new is the instance that was just launched, and its absence means the
 launch could not be confirmed.
+
+## Contributing
+
+Bug reports, feature requests, and pull requests are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, code style, and
+what this project intentionally does *not* try to do (Windows/Linux support
+isn't a goal; the mechanism this tool wraps is macOS-specific).
+
+This project follows a [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Found a security issue? Please see [SECURITY.md](SECURITY.md) rather than
+opening a public issue.
+
+## Support
+
+- **Bugs and feature requests:** [open an issue](https://github.com/lirish30/ableton-multi-mcp/issues).
+- **Questions:** [start a discussion](https://github.com/lirish30/ableton-multi-mcp/discussions).
+
+## License
+
+[MIT](LICENSE) © Logan Irish

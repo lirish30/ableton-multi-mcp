@@ -8,3 +8,7 @@ dist/
 
 # Claude Code's worktree registry — host-managed, not project content.
 /.claude/
+
+# The author's own Ableton project library, used for local manual testing —
+# personal creative work, never committed.
+/projects/

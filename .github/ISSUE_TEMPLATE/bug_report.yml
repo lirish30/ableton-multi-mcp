@@ -1,0 +1,56 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much
+        of this as you can — especially your Ableton Live version and
+        edition, since that's the part that varies most between reports.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you ask your agent to do, and what actually happened?
+      placeholder: |
+        I asked Claude to open "Midnight Drive" in a new instance, and...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: "e.g. macOS 15.1 (Sequoia)"
+    validations:
+      required: true
+  - type: input
+    id: ableton-version
+    attributes:
+      label: Ableton Live version and edition
+      placeholder: "e.g. Ableton Live 11 Suite"
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Run `node -v`
+    validations:
+      required: false
+  - type: textarea
+    id: tool-output
+    attributes:
+      label: Tool output
+      description: >
+        The exact text the MCP tool returned. Ask your agent to show you the
+        raw tool result if it isn't already visible.
+      render: text
+    validations:
+      required: false

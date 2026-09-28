@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an idea for this project
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project intentionally stays small and macOS-only — see
+        [CONTRIBUTING.md](../../CONTRIBUTING.md) before proposing something
+        that expands scope significantly (e.g. Windows support). It's still
+        worth asking, just know the bar for "yes" is "does this stay in
+        keeping with a small, focused tool."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+    validations:
+      required: false

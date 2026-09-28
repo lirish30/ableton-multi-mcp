@@ -1,0 +1,6 @@
+# Normalize line endings for everyone, regardless of OS or editor settings.
+* text=auto eol=lf
+
+# Generated — don't show up in language stats or diffs people need to review by hand.
+package-lock.json linguist-generated=true -diff
+dist/** linguist-generated=true -diff
